@@ -26,11 +26,15 @@ class BERTClassifierModel(nn.Module):
         self.classifier = nn.Linear(768, 9)
         self.dropout = nn.Dropout(dropout)
 
-    # TO-DO: If using BERT-Base, include token_type_ids in forward.
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, token_type_ids):
         # [CLS] embedding used for finetuning is at 0th index of output.
-        x = self.bert(input_ids,
-                      attention_mask=attention_mask)['last_hidden_state'][:,0,:]
+        if token_type_ids:
+            x = self.bert(input_ids,
+                          attention_mask=attention_mask,
+                          token_type_ids=token_type_ids)['last_hidden_state'][:,0,:]
+        else:
+            x = self.bert(input_ids,
+                          attention_mask=attention_mask)['last_hidden_state'][:,0,:]
         x = self.dropout(x)
         x = self.classifier(x)
         return x

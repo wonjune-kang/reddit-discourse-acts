@@ -83,7 +83,7 @@ class RedditDiscourseActTrainer:
         return val_labels, val_pred, accuracy
 
     def train(self, dataloader, dataset, num_epochs):
-        output_interval = len(dataloader)//10
+        output_interval = len(dataloader) // 10
         criterion = nn.CrossEntropyLoss()
 
         best_val_f1 = 0.0
@@ -102,13 +102,14 @@ class RedditDiscourseActTrainer:
             for batch_id, batch_encodings in enumerate(dataloader):
                 input_ids = batch_encodings['input_ids'].to(self.device)
                 attention_mask = batch_encodings['attention_mask'].to(self.device)
+                token_type_ids = batch_encodings['token_type_ids'] if 'token_type_ids' in batch_encodings else None
                 labels = batch_encodings['labels'].to(self.device)
 
                 # Zero parameter gradients.
                 self.optimizer.zero_grad()
 
                 # Pass the inputs through the model.
-                outputs = self.model(input_ids, attention_mask)
+                outputs = self.model(input_ids, attention_mask, token_type_ids)
 
                 # Backpropagate loss.
                 loss = criterion(outputs, labels)
