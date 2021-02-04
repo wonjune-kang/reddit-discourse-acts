@@ -1,0 +1,8 @@
+.DS_Store
+*.swp
+.ipynb_checkpoints
+*.sh
+__pycache__
+checkpoints
+logs
+data
