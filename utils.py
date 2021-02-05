@@ -4,6 +4,25 @@ import torch.optim as optim
 from reddit_tokenizer import LABELS2TOKENS, IDX2LABELS
 
 
+def get_xval_splits(all_data, k=10):
+    np.random.seed(0)
+    np.random.shuffle(all_data)
+    xval_splits = np.array_split(all_data, k)
+    return xval_splits
+
+def get_train_val_test_splits(xval_splits, test_idx):
+    assert test_idx >= 0, "This function was written to work for positive test_idx values."
+
+    val_idx = test_idx - 1
+    test_data = xval_splits[test_idx]
+    val_data = xval_splits[val_idx]
+    if test_idx == 0:
+        train_data = np.concatenate(xval_splits[test_idx+1:val_idx])
+    else:
+        train_data = np.concatenate(xval_splits[:val_idx] + xval_splits[test_idx+1:])
+
+    return train_data, val_data, test_data
+
 def get_subtree_string(target_node, max_subtree_depth, use_ancestor_label=True,
                        randomize_prob=0.1, eval=False):
     """
@@ -63,21 +82,3 @@ def get_subtree_string(target_node, max_subtree_depth, use_ancestor_label=True,
     context_string = ' '.join(ancestor_contents)
 
     return target_string, context_string
-
-def get_lr(optimizer):
-    for param_group in optimizer.param_groups:
-        return param_group['lr']
-
-def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
-    """
-    Create a schedule with a learning rate that decreases linearly after
-    linearly increasing during a warmup period.
-    """
-    def lr_lambda(current_step):
-        if current_step < num_warmup_steps:
-            return float(current_step) / float(max(1, num_warmup_steps))
-        return max(
-            0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
-        )
-    
-    return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch)

@@ -6,16 +6,19 @@ from reddit_tokenizer import LABELS2IDX
 
 
 class RedditDataset(Dataset):
-    def __init__(self, data_directory, tokenizer, max_subtree_depth, use_ancestor_labels, randomize_prob):
-        # Generate trees for all Reddit thread JSON files in data directory.
-        trees = process_all_trees(data_directory)
-
-        # Split data into train and validation sets at the tree (thread) level.
-        self.train_trees = trees[:int(0.9*len(trees))]
-        self.val_trees = trees[int(0.9*len(trees)):]
+    def __init__(self, train_data, val_data, test_data, tokenizer,
+                 max_subtree_depth, use_ancestor_labels, randomize_prob):
+        # Split data into train, val, test sets at the tree (thread) level.
+        self.train_trees = train_data
+        self.val_trees = val_data
+        self.test_trees = test_data
 
         # Tokenizer for BERT encoder.
         self.tokenizer = tokenizer
+
+        # Denotes the maximum number of ancestors to consider for context
+        # information.
+        self.max_subtree_depth = max_subtree_depth
 
         # Flag for whether to include ancestor labels tokens in inputs.
         self.use_ancestor_labels = use_ancestor_labels
@@ -26,14 +29,12 @@ class RedditDataset(Dataset):
         # Get list of all post nodes in the dataset for length and indexing.
         self.train_nodes = [node for tree in self.train_trees for node in tree.nodes.values()]
         self.val_nodes = [node for tree in self.val_trees for node in tree.nodes.values()]
-
-        # Denotes the maximum number of ancestors to consider for context
-        # information.
-        self.max_subtree_depth = max_subtree_depth
+        self.test_nodes = [node for tree in self.test_trees for node in tree.nodes.values()]
 
         # Get the label index data for all nodes.
         self.train_labels = [LABELS2IDX[node.label] for node in self.train_nodes]
         self.val_labels = [LABELS2IDX[node.label] for node in self.val_nodes]
+        self.test_labels = [LABELS2IDX[node.label] for node in self.test_nodes]
 
     def __len__(self):
         # Only the length of the train dataset is needed for the dataloader.

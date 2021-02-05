@@ -8,12 +8,13 @@ from utils import get_subtree_string
 
 
 class RedditDiscourseActTrainer:
-    def __init__(self, model, device, optimizer, scheduler, ckpt_directory):
+    def __init__(self, run_name, model, device, optimizer, scheduler, save_directory):
+        self.run_name = run_name
         self.model = model
         self.device = device
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.ckpt_directory = ckpt_directory
+        self.save_directory = save_directory
 
     def predict_node(self, target_node, max_subtree_depth, use_ancestor_labels):
         """
@@ -34,9 +35,10 @@ class RedditDiscourseActTrainer:
         # Send the model inputs to the device.
         input_ids = encoded_subtree['input_ids'].to(self.device)
         attention_mask = encoded_subtree['attention_mask'].to(self.device)
+        token_type_ids = encoded_subtree['token_type_ids'] if 'token_type_ids' in encoded_subtree else None
 
         # Feed the inputs through the model and get the prediction.
-        logits = self.model(input_ids, attention_mask)
+        logits = self.model(input_ids, attention_mask, token_type_ids)
         pred = torch.argmax(logits).item()
 
         # Assign the string label for the prediction to the target node's
@@ -58,35 +60,53 @@ class RedditDiscourseActTrainer:
             queue.extend(node.children)
         return
 
-    def evaluate(self, dataset):
+    def evaluate(self, dataset, eval_set='val'):
         """
         Evaluate the model's performance on the dataset's validation split.
         Make predictions for all RedditTree objects in the validation split
         and compute the resulting node-level accuracy.
         """
+        if eval_set == 'val':
+            eval_trees = dataset.val_trees
+            eval_nodes = dataset.val_nodes
+        elif eval_set == 'test':
+            eval_trees = dataset.test_trees
+            eval_nodes = dataset.test_nodes
+        else:
+            raise Exception("Must evaluate on either 'val' or 'test' set.")
+
         # Make predictions for all trees in the validation split.
-        for tree in dataset.val_trees:
+        for tree in eval_trees:
             self.predict_tree(tree, dataset.max_subtree_depth, dataset.use_ancestor_labels)
 
         # Iterate through all nodes and compute accuracy. Maintain lists of
         # labels and predictions for computing precision, recall, and F1 score.
-        val_labels = []
-        val_pred = []
+        eval_labels = []
+        eval_pred = []
         correct = 0
-        for node in dataset.val_nodes:
+        for node in eval_nodes:
             if node.label == node.pred:
                 correct += 1
-            val_labels.append(LABELS2IDX[node.label])
-            val_pred.append(LABELS2IDX[node.pred])
-        accuracy = correct/len(dataset.val_nodes)
+            eval_labels.append(LABELS2IDX[node.label])
+            eval_pred.append(LABELS2IDX[node.pred])
+        accuracy = correct/len(eval_nodes)
 
-        return val_labels, val_pred, accuracy
+        return eval_labels, eval_pred, accuracy
+
+    def save_model_weights(self):
+        self.model.eval().cpu()
+        save_filename = self.run_name+".model"
+        save_path = os.path.join(self.save_directory, save_filename)
+        torch.save(self.model.state_dict(), save_path)
 
     def train(self, dataloader, dataset, num_epochs):
         output_interval = len(dataloader) // 10
         criterion = nn.CrossEntropyLoss()
 
-        best_val_f1 = 0.0
+        best_val_accuracy, best_test_accuracy = 0.0, 0.0
+        best_val_precision, best_test_precision = 0.0, 0.0
+        best_val_recall, best_test_recall = 0.0, 0.0
+        best_val_f1, best_test_f1 = 0.0, 0.0
         for epoch in range(num_epochs):
             print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
             print('-' * 10)
@@ -160,7 +180,7 @@ class RedditDiscourseActTrainer:
                 self.model.eval()
 
                 # Evaluate on the dataset's validation split.
-                val_labels, val_pred, val_accuracy = self.evaluate(dataset)
+                val_labels, val_pred, val_accuracy = self.evaluate(dataset, eval_set='val')
 
                 # Compute and print statistics for validation split.
                 val_precision = precision_score(val_labels, val_pred, average='weighted')
@@ -172,20 +192,37 @@ class RedditDiscourseActTrainer:
                 print("Validation recall: {:.4f}".format(val_recall))
                 print("Validation F1 score: {:.4f}".format(val_f1))
 
-            # # Save model weights and evaluate on test split if best
-            # # validation F1 score.
-            # if val_f1 > best_val_f1:
-            #     best_val_f1 = val_f1
-            #
-            #     ### Evaluate on test split
-            #
-            #     if ckpt_directory is not None:
-            #         model.eval().cpu()
-            #         ckpt_filename = "best_epoch_" + str(epoch) + ".model"
-            #         ckpt_model_path = os.path.join(ckpt_directory, ckpt_filename)
-            #         torch.save(model.state_dict(), ckpt_model_path)
-            #
-            #     model.to(device).train()
+            # Save model weights and evaluate on test split if best
+            # validation F1 score.
+            if val_f1 > best_val_f1:
+                print("\nAchieved best validation F1 score. Evaluating on test set.")            
+
+                best_val_accuracy = val_accuracy
+                best_val_precision = val_precision
+                best_val_recall = val_recall
+                best_val_f1 = val_f1
+
+                test_labels, test_pred, test_accuracy = self.evaluate(dataset, eval_set='test')
+
+                # Compute and print statistics for test split.
+                test_precision = precision_score(test_labels, test_pred, average='weighted')
+                test_recall = recall_score(test_labels, test_pred, average='weighted')
+                test_f1 = f1_score(test_labels, test_pred, average='weighted')
+
+                best_test_accuracy = test_accuracy
+                best_test_precision = test_precision
+                best_test_recall = test_recall
+                best_test_f1 = test_f1
+
+                print("\nTest accuracy: {:.4f}".format(test_accuracy))
+                print("Test precision: {:.4f}".format(test_precision))
+                print("Test recall: {:.4f}".format(test_recall))
+                print("Test F1 score: {:.4f}".format(test_f1))
+
+                if self.save_directory is not None:
+                    print("Saving model weights to", self.save_directory)
+                    self.save_model_weights()
+                    self.model.to(device).train()
 
         # # Save final model
         # model.eval().cpu()
