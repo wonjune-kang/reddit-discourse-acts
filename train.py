@@ -121,12 +121,12 @@ if __name__ == '__main__':
     # Get device; detect if there is a GPU available.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if device == torch.device("cuda:0"):
-        print("Using GPU.\n")
+        print("Using GPU(s).\n")
+        if torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model, device_ids=list(range(num_gpus)))
     else:
         print("Using CPU.\n")
     
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model, device_ids=list(range(num_gpus)))
     model = model.to(device)
 
     # Generate trees for all Reddit thread JSON files in data path.
