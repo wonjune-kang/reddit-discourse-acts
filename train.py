@@ -1,4 +1,5 @@
 import os
+import csv
 import argparse
 import torch
 import torch.optim as optim
@@ -13,17 +14,38 @@ from utils import get_xval_splits, get_train_val_test_splits
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 
+def init_score_file(score_file):
+    """
+    Initializes a CSV file for logging scores with five headers:
+    Fold, Accuracy, Precision, Recall, and F1 score.
+    """
+    with open(score_file, 'a', newline='') as log_file:
+        csv_writer = csv.writer(log_file, delimiter='\t')
+        csv_writer.writerow(['Fold', 'Acc', 'Prec', 'Recall', 'F1'])
+    return
+
+def write_scores(score_file, fold_idx, scores):
+    """
+    Writes the scores for a run into a CSV log file. scores is a 4-tuple
+    containing accuracy, precision, recall, and F1 score in that order.
+    """
+    with open(score_file, 'a', newline='') as log_file:
+        csv_writer = csv.writer(log_file, delimiter='\t')
+        csv_writer.writerow([fold_idx]+[round(x, 4) for x in scores])
+    return
+
 def parse_args():
     parser = argparse.ArgumentParser(description="RedditDiscourseActTrainer")
 
-    parser.add_argument('--data_directory', type=str, default="./data/reddit_coarse_discourse", help='Directory where sentence embeddings are saved')
+    parser.add_argument('--run_name', type=str, required=True, help='String identifying the name of the run (e.g. using hyperparameters)')
+    parser.add_argument('--data_path', type=str, default="./data/reddit_coarse_discourse_clean", help='path where sentence embeddings are saved')
 
     parser.add_argument('--num_epochs', type=int, default=10, help='Number of training epochs')
     parser.add_argument('--lr', type=float, default=2e-5, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay parameter')
 
-    parser.add_argument('--bert_encoder_type', type=str, default='DistilBERT', help='Type of BERT encoder (either BERT-Base or DistilBERT)')
+    parser.add_argument('--bert_encoder_type', type=str, default='BERT-Base', help='Type of BERT encoder (either BERT-Base or DistilBERT)')
     parser.add_argument('--dim_feedforward', type=int, default=768, help='Size of feedforward layer for finetuning')
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout probability in feedforward layers')
     
@@ -33,12 +55,8 @@ def parse_args():
     parser.add_argument('--randomize_prob', type=float, default=0.1, help='Probability of using random ancestor label during training')
     parser.set_defaults(use_ancestor_labels=True)
 
-    parser.add_argument('--run_name', type=str, help='String identifying the name of the run (e.g. using hyperparameters)')
-    parser.add_argument('--save_directory', type=str, default="./model_weights", help='Path to save model weights')
-    parser.add_argument('--log_file', type=str, default="./logs/log.csv", help='Path to log file')
-    parser.add_argument('--run_xval', dest='run_xval', action='store_true', help='Run 10-fold cross validation')
-    parser.add_argument('--no_xval', dest='run_xval', action='store_false', help='Do not run 10-fold cross validation')
-    parser.set_defaults(run_xval=False)
+    parser.add_argument('--xval_test_idx', type=int, default=0, help='Cross validation split index to use for testing (must be integer in range [0,9]).')
+    parser.add_argument('--save_path', type=str, default="./results", help='Path to save model weights and logs.')
 
     args = parser.parse_args()
     return args
@@ -47,8 +65,11 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
-    # Directory where dataset is located.
-    data_directory = args.data_directory
+    # Set the identifier string for the run name.
+    run_name = args.run_name
+
+    # Path where the dataset is located.
+    data_path = args.data_path
 
     # General training hyperparameters.
     num_epochs = args.num_epochs
@@ -66,69 +87,89 @@ if __name__ == '__main__':
     use_ancestor_labels = args.use_ancestor_labels
     randomize_prob = args.randomize_prob
 
-    # Checkpoint directory for saving model weights.
-    run_name = args.run_name
-    save_directory = args.save_directory
-    run_xval = args.run_xval
-    # os.makedirs(save_directory, exist_ok=True)
+    # Index of test set for 10-fold cross validation.
+    xval_test_idx = args.xval_test_idx
+    assert xval_test_idx in range(0, 10), "Cross validation split index must be an integer in range [0, 9]."
+
+    # Set save path for logs and model weights.
+    save_path = args.save_path
+    model_save_path = os.path.join(save_path, 'models')
+    os.makedirs(model_save_path, exist_ok=True)
+
+    if os.path.exists(os.path.join(model_save_path, model_weight_file)):
+        raise Exception("The given run name and cross validation index "
+                        "combination appears to already exist. Please provide "
+                        "a new combination or delete the existing weight file.")
+
+    # Initialize model weight filename and validation and test score log files.
+    model_weight_file = '_'.join([run_name, 'fold'+str(xval_test_idx)])+'.model'
+    val_score_file = os.path.join(save_path, 'val_scores.txt')
+    if not os.path.exists(val_score_file):
+        init_score_file(val_score_file)
+    test_score_file = os.path.join(save_path, 'test_scores.txt')
+    if not os.path.exists(test_score_file):
+        init_score_file(test_score_file)
 
     # Get device; detect if there is a GPU available.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if device == torch.device("cuda:0"):
-        print("Using GPU.")
+        print("Using GPU.\n")
     else:
-        print("Using CPU.")
+        print("Using CPU.\n")
 
-    # Generate trees for all Reddit thread JSON files in data directory.
-    all_thread_trees = process_all_trees(data_directory)
+    # Initialize model and send to device.
+    model = BERTClassifierModel(bert_encoder_type,
+                                dim_feedforward=dim_feedforward,
+                                dropout=dropout)
+    model = model.to(device)
+
+    # Generate trees for all Reddit thread JSON files in data path.
+    all_thread_trees = process_all_trees(data_path)
+
+    # Split the data into train-val-test sets at the thread (tree) level.
     xval_splits = get_xval_splits(all_thread_trees)
+    train_data, val_data, test_data = get_train_val_test_splits(xval_splits, xval_test_idx)
 
-    for test_idx in range(10):
-        # Initialize model and send to device.
-        model = BERTClassifierModel(bert_encoder_type,
-                                    dim_feedforward=dim_feedforward,
-                                    dropout=dropout)
-        model = model.to(device)
+    # Initialize dataset.
+    reddit_dataset = RedditDataset(train_data,
+                                   val_data,
+                                   test_data,
+                                   model.tokenizer,
+                                   max_subtree_depth,
+                                   use_ancestor_labels,
+                                   randomize_prob)
 
-        train_data, val_data, test_data = get_train_val_test_splits(xval_splits, test_idx)
+    # Initialize dataloader.
+    reddit_loader = torch.utils.data.DataLoader(reddit_dataset,
+                                                batch_size=batch_size,
+                                                shuffle=True,
+                                                num_workers=0,
+                                                drop_last=False)
 
-        # Initialize dataset.
-        reddit_dataset = RedditDataset(train_data,
-                                        val_data,
-                                        test_data,
-                                        model.tokenizer,
-                                        max_subtree_depth,
-                                        use_ancestor_labels,
-                                        randomize_prob)
+    # Initialize optimizer.
+    optimizer = optim.Adam(model.parameters(),
+                            lr=lr,
+                            weight_decay=weight_decay)
 
-        # Initialize dataloader.
-        reddit_loader = torch.utils.data.DataLoader(reddit_dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=True,
-                                                    num_workers=4,
-                                                    drop_last=False)
+    # Set up learning rate scheduler.
+    num_training_steps = len(reddit_loader) * num_epochs
+    num_warmup_steps = num_training_steps // 10
+    scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                num_warmup_steps,
+                                                num_training_steps)
 
-        # Initialize optimizer and learning rate scheduler.
-        optimizer = optim.Adam(model.parameters(),
-                               lr=lr,
-                               weight_decay=weight_decay)
-        num_training_steps = len(reddit_loader) * num_epochs
-        num_warmup_steps = num_training_steps // 10
-        scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                    num_warmup_steps,
-                                                    num_training_steps)
+    # Initialize Trainer that wraps all training parameters and objects.
+    RedditTrainer = RedditDiscourseActTrainer(run_name,
+                                              model,
+                                              device,
+                                              optimizer,
+                                              scheduler,
+                                              model_save_path,
+                                              model_weight_file)
 
-        # Initialize Trainer that wraps all training parameters and objects.
-        RedditTrainer = RedditDiscourseActTrainer(run_name,
-                                                  model,
-                                                  device,
-                                                  optimizer,
-                                                  scheduler,
-                                                  save_directory)
-
-        # Train the model.
-        RedditTrainer.train(reddit_loader, reddit_dataset, num_epochs)
-
-        if run_xval == False:
-            print("\nNot running 10-fold cross validation. Exiting after running 1 fold.")
-            exit()
+    # Train the model.
+    val_scores, test_scores = RedditTrainer.train(reddit_loader, reddit_dataset, num_epochs)
+    
+    # Write validation and test scores to logs.
+    write_scores(val_score_file, xval_test_idx, val_scores)
+    write_scores(test_score_file, xval_test_idx, test_scores)

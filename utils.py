@@ -4,13 +4,20 @@ import torch.optim as optim
 from reddit_tokenizer import LABELS2TOKENS, IDX2LABELS
 
 
-def get_xval_splits(all_data, k=10):
-    np.random.seed(0)
+def get_xval_splits(all_data, k=10, random_seed=0):
+    """
+    Shuffle the data and split into k(=10) folds for cross validation.
+    """
+    np.random.seed(random_seed)
     np.random.shuffle(all_data)
     xval_splits = np.array_split(all_data, k)
     return xval_splits
 
 def get_train_val_test_splits(xval_splits, test_idx):
+    """
+    Given the 10 folds from the dataset, split it into train-val-test sets
+    in an 80-10-10 ratio. The validation set index is set as test_idx - 1.
+    """
     assert test_idx >= 0, "This function was written to work for positive test_idx values."
 
     val_idx = test_idx - 1

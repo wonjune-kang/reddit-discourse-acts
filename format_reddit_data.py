@@ -126,7 +126,7 @@ def process_all_trees(data_directory):
     in the given data directory.
     """
     all_trees = []
-    for filename in tqdm(sorted(os.listdir(data_directory)[:1000])):
+    for filename in tqdm(sorted(os.listdir(data_directory))):
         json_file = os.path.join(data_directory, filename)
         with open(json_file, 'r') as f:
             thread_data = json.load(f)

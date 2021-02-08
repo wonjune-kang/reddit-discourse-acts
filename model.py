@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from transformers import BertModel, DistilBertModel
+from transformers import BertTokenizer, DistilBertTokenizer
 
-from reddit_tokenizer import bert_tokenizer, distilbert_tokenizer
+from reddit_tokens import SPECIAL_TOKENS
 
 
 class BERTClassifierModel(nn.Module):
@@ -12,17 +13,20 @@ class BERTClassifierModel(nn.Module):
         assert bert_encoder_type in ['BERT-Base', 'DistilBERT'], \
             "Only BERT-Base and DistilBERT encoders have been implemented"
 
-        # Load pre-trained model weights and resize model vocabulary to add
-        # new special tokens
+        # Load pre-trained model weights and initialize corresponding tokenizer.
         if bert_encoder_type == 'BERT-Base':
             self.bert = BertModel.from_pretrained('bert-base-uncased')
-            self.tokenizer = bert_tokenizer
+            self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         elif bert_encoder_type == 'DistilBERT':
             self.bert = DistilBertModel.from_pretrained('distilbert-base-uncased')
-            self.tokenizer = distilbert_tokenizer
+            self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        
+        # Add special tokens and resize model vocabulary.
+        self.tokenizer.add_special_tokens(SPECIAL_TOKENS)
         self.bert.resize_token_embeddings(len(self.tokenizer))
 
-        # 768 is dimension of BERT embeddings. 9-way classification task.
+        # 768 is dimension of BERT embeddings.
+        # 9 is for the 9-way discourse act classification task.
         self.classifier = nn.Linear(768, 9)
         self.dropout = nn.Dropout(dropout)
 
