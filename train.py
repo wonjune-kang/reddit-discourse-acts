@@ -2,6 +2,7 @@ import os
 import csv
 import argparse
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from transformers.optimization import get_linear_schedule_with_warmup
 
@@ -40,6 +41,7 @@ def parse_args():
     parser.add_argument('--run_name', type=str, required=True, help='String identifying the name of the run (e.g. using hyperparameters)')
     parser.add_argument('--data_path', type=str, default="./data/reddit_coarse_discourse_clean", help='path where sentence embeddings are saved')
 
+    parser.add_argument('--num_gpus', type=int, default=1, help='Number of GPUs to use for training')
     parser.add_argument('--num_epochs', type=int, default=10, help='Number of training epochs')
     parser.add_argument('--lr', type=float, default=2e-5, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
@@ -72,6 +74,7 @@ if __name__ == '__main__':
     data_path = args.data_path
 
     # General training hyperparameters.
+    num_gpus = args.num_gpus
     num_epochs = args.num_epochs
     lr = args.lr
     batch_size = args.batch_size
@@ -92,7 +95,7 @@ if __name__ == '__main__':
     assert xval_test_idx in range(0, 10), "Cross validation split index must be an integer in range [0, 9]."
 
     # Set save path for logs and model weights.
-    save_path = args.save_path
+    save_path = os.path.join(args.save_path, run_name)
     model_save_path = os.path.join(save_path, 'models')
     os.makedirs(model_save_path, exist_ok=True)
 
@@ -110,17 +113,20 @@ if __name__ == '__main__':
                         "combination appears to already exist. Please provide "
                         "a new combination or delete the existing weight file.")
 
+    # Initialize model and send to device.
+    model = BERTClassifierModel(bert_encoder_type,
+                                dim_feedforward=dim_feedforward,
+                                dropout=dropout)
+
     # Get device; detect if there is a GPU available.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if device == torch.device("cuda:0"):
         print("Using GPU.\n")
     else:
         print("Using CPU.\n")
-
-    # Initialize model and send to device.
-    model = BERTClassifierModel(bert_encoder_type,
-                                dim_feedforward=dim_feedforward,
-                                dropout=dropout)
+    
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model, device_ids=list(range(num_gpus)))
     model = model.to(device)
 
     # Generate trees for all Reddit thread JSON files in data path.
