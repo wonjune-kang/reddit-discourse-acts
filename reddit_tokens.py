@@ -1,6 +1,3 @@
-from transformers import BertTokenizer, DistilBertTokenizer
-
-
 # Dictionary of all new special tokens to add to BERT model.
 SPECIAL_TOKENS = {'additional_special_tokens': ['[CTXTSEP]',
                                                 '[QUES]',
@@ -46,10 +43,3 @@ IDX2LABELS = {0: 'question',
               6: 'appreciation',
               7: 'elaboration',
               8: 'humor'}
-
-
-# Initialize BERT tokenizer and add new special tokens.
-bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-distilbert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-bert_tokenizer.add_special_tokens(SPECIAL_TOKENS)
-distilbert_tokenizer.add_special_tokens(SPECIAL_TOKENS)
