@@ -1,7 +1,7 @@
 import numpy as np
 import torch.optim as optim
 
-from reddit_tokenizer import LABELS2TOKENS, IDX2LABELS
+from reddit_tokens import LABELS2TOKENS, IDX2LABELS
 
 
 def get_xval_splits(all_data, k=10, random_seed=0):

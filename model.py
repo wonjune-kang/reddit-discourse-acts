@@ -32,7 +32,7 @@ class BERTClassifierModel(nn.Module):
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         # [CLS] embedding used for finetuning is at 0th index of output.
-        if token_type_ids:
+        if token_type_ids is not None:
             x = self.bert(input_ids,
                           attention_mask=attention_mask,
                           token_type_ids=token_type_ids)['last_hidden_state'][:,0,:]

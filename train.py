@@ -96,11 +96,6 @@ if __name__ == '__main__':
     model_save_path = os.path.join(save_path, 'models')
     os.makedirs(model_save_path, exist_ok=True)
 
-    if os.path.exists(os.path.join(model_save_path, model_weight_file)):
-        raise Exception("The given run name and cross validation index "
-                        "combination appears to already exist. Please provide "
-                        "a new combination or delete the existing weight file.")
-
     # Initialize model weight filename and validation and test score log files.
     model_weight_file = '_'.join([run_name, 'fold'+str(xval_test_idx)])+'.model'
     val_score_file = os.path.join(save_path, 'val_scores.txt')
@@ -109,6 +104,11 @@ if __name__ == '__main__':
     test_score_file = os.path.join(save_path, 'test_scores.txt')
     if not os.path.exists(test_score_file):
         init_score_file(test_score_file)
+
+    if os.path.exists(os.path.join(model_save_path, model_weight_file)):
+        raise Exception("The given run name and cross validation index "
+                        "combination appears to already exist. Please provide "
+                        "a new combination or delete the existing weight file.")
 
     # Get device; detect if there is a GPU available.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -124,6 +124,7 @@ if __name__ == '__main__':
     model = model.to(device)
 
     # Generate trees for all Reddit thread JSON files in data path.
+    print("Processing dataset into tree structure:")
     all_thread_trees = process_all_trees(data_path)
 
     # Split the data into train-val-test sets at the thread (tree) level.
