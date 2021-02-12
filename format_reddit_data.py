@@ -137,7 +137,7 @@ def process_all_trees(data_directory):
         tree = generate_tree(thread_data)
         
         # Use the tree only if it corresponds to a Reddit thread with
-        # at least valid one response in addition to the initial post.
+        # at least one valid response in addition to the initial post.
         if len(tree.nodes) > 1:
             all_trees.append(tree)
 

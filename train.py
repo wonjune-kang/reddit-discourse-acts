@@ -39,7 +39,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="RedditDiscourseActTrainer")
 
     parser.add_argument('--run_name', type=str, required=True, help='String identifying the name of the run (e.g. using hyperparameters)')
-    parser.add_argument('--data_path', type=str, default="./data/reddit_coarse_discourse_clean", help='path where sentence embeddings are saved')
+    parser.add_argument('--data_path', type=str, default="./data/reddit_coarse_discourse_clean", help='Path where JSON files are saved')
 
     parser.add_argument('--num_gpus', type=int, default=1, help='Number of GPUs to use for training')
     parser.add_argument('--num_epochs', type=int, default=10, help='Number of training epochs')

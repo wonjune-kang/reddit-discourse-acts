@@ -3,6 +3,7 @@ import time
 import torch
 import torch.nn as nn
 from sklearn.metrics import precision_score, recall_score, f1_score
+from tqdm import tqdm
 
 from reddit_tokens import LABELS2IDX, IDX2LABELS
 from utils import get_subtree_string
@@ -81,7 +82,7 @@ class RedditDiscourseActTrainer:
             raise Exception("Must evaluate on either 'val' or 'test' set.")
 
         # Make predictions for all trees.
-        for tree in eval_trees:
+        for tree in tqdm(eval_trees):
             self.predict_tree(tree, dataset.max_subtree_depth, dataset.use_ancestor_labels)
 
         # Iterate through all nodes and compute accuracy. Maintain lists of
