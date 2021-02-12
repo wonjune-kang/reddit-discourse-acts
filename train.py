@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay parameter')
 
     parser.add_argument('--bert_encoder_type', type=str, default='BERT-Base', help='Type of BERT encoder (either BERT-Base or DistilBERT)')
-    parser.add_argument('--dim_feedforward', type=int, default=768, help='Size of feedforward layer for finetuning')
+    parser.add_argument('--num_classes', type=int, default=9, help='Number of classes for the BERT fine-tuning task')
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout probability in feedforward layers')
     
     parser.add_argument('--max_subtree_depth', type=int, default=2, help='Maximum number of ancestor nodes to consider for context information')
@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
     # Model hyperparameters.
     bert_encoder_type = args.bert_encoder_type
-    dim_feedforward = args.dim_feedforward
+    num_classes = args.num_classes
     dropout = args.dropout
 
     # Hyperparameters for processing data before feeding into model.
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     # Initialize model and send to device.
     model = BERTClassifierModel(bert_encoder_type,
-                                dim_feedforward=dim_feedforward,
+                                num_classes=num_classes,
                                 dropout=dropout)
 
     # Get device; detect if there is a GPU available.
