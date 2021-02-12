@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 for i in {0..9}; do
+    echo "Running cross validation fold $i\n"
     python3 -u train.py \
         --run_name bertbase_subtree_3_wd_0.0 \
         --data_path ../data/reddit_coarse_discourse_clean \
