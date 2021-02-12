@@ -141,7 +141,7 @@ if __name__ == '__main__':
     reddit_dataset = RedditDataset(train_data,
                                    val_data,
                                    test_data,
-                                   model.tokenizer,
+                                   model.module.tokenizer,
                                    max_subtree_depth,
                                    use_ancestor_labels,
                                    randomize_prob)
@@ -151,7 +151,7 @@ if __name__ == '__main__':
                                                 batch_size=batch_size,
                                                 shuffle=True,
                                                 num_workers=0,
-                                                drop_last=False)
+                                                drop_last=True)
 
     # Initialize optimizer.
     optimizer = optim.Adam(model.parameters(),

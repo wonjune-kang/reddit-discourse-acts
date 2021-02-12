@@ -30,10 +30,11 @@ class RedditDiscourseActTrainer:
                                                            max_subtree_depth,
                                                            use_ancestor_labels,
                                                            eval=True)
-        encoded_subtree = self.model.tokenizer(target_string, context_string,
-                                               truncation=True,
-                                               padding='max_length',
-                                               return_tensors='pt')
+        encoded_subtree = self.model.module.tokenizer(target_string,
+                                                      context_string,
+                                                      truncation=True,
+                                                      padding='max_length',
+                                                      return_tensors='pt')
 
         # Send the model inputs to the device.
         input_ids = encoded_subtree['input_ids'].to(self.device)
@@ -194,28 +195,14 @@ class RedditDiscourseActTrainer:
                 print("Validation recall: {:.4f}".format(val_recall))
                 print("Validation F1 score: {:.4f}".format(val_f1))
 
-            # Save model weights and evaluate on test set if best
-            # validation F1 score.
+            # Save model weights if achieving best validation F1 score.
             if val_f1 > best_val_f1:
-                print("\nAchieved best validation F1 score.")
+                print("\nAchieved best validation F1 score. Saving model weights.")
 
                 best_val_accuracy = val_accuracy
                 best_val_precision = val_precision
                 best_val_recall = val_recall
                 best_val_f1 = val_f1
-
-                # Evaluate model on test set
-                test_labels, test_pred, test_accuracy = self.evaluate(dataset, eval_set='test')
-
-                # Compute and print statistics for test set.
-                test_precision = precision_score(test_labels, test_pred, average='weighted')
-                test_recall = recall_score(test_labels, test_pred, average='weighted')
-                test_f1 = f1_score(test_labels, test_pred, average='weighted')
-
-                best_test_accuracy = test_accuracy
-                best_test_precision = test_precision
-                best_test_recall = test_recall
-                best_test_f1 = test_f1
 
                 # Save model weights.
                 if self.save_path is not None:
@@ -226,11 +213,29 @@ class RedditDiscourseActTrainer:
                     torch.save(self.model.state_dict(), weight_save_path)
                     self.model.to(self.device).train()
 
-        print("\nTraining complete.")
-        print("Test accuracy: {:.4f}".format(best_test_accuracy))
-        print("Test precision: {:.4f}".format(best_test_precision))
-        print("Test recall: {:.4f}".format(best_test_recall))
-        print("Test F1 score: {:.4f}".format(best_test_f1))
+        print("\nTraining complete. Loading best model weights and evaluating on test set.")
+
+        # Load best model weights.
+        weight_save_path = os.path.join(self.save_path, self.model_weight_file)
+        self.model.load_state_dict(torch.load(weight_save_path))
+
+        # Evaluate model on test set.
+        test_labels, test_pred, test_accuracy = self.evaluate(dataset, eval_set='test')
+
+        # Compute and print statistics for test set.
+        test_precision = precision_score(test_labels, test_pred, average='weighted')
+        test_recall = recall_score(test_labels, test_pred, average='weighted')
+        test_f1 = f1_score(test_labels, test_pred, average='weighted')
+
+        # best_test_accuracy = test_accuracy
+        # best_test_precision = test_precision
+        # best_test_recall = test_recall
+        # best_test_f1 = test_f1
+
+        print("Test accuracy: {:.4f}".format(test_accuracy))
+        print("Test precision: {:.4f}".format(test_precision))
+        print("Test recall: {:.4f}".format(test_recall))
+        print("Test F1 score: {:.4f}".format(test_f1))
 
         return (best_val_accuracy, best_val_precision, best_val_recall, best_val_f1), \
-               (best_test_accuracy, best_test_precision, best_test_recall, best_test_f1)
+               (test_accuracy, test_precision, test_recall, test_f1)
