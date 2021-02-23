@@ -63,8 +63,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-
-if __name__ == '__main__':
+def run():
     args = parse_args()
 
     # Set the identifier string for the run name.
@@ -155,8 +154,8 @@ if __name__ == '__main__':
 
     # Initialize optimizer.
     optimizer = optim.Adam(model.parameters(),
-                            lr=lr,
-                            weight_decay=weight_decay)
+                           lr=lr,
+                           weight_decay=weight_decay)
 
     # Set up learning rate scheduler.
     num_training_steps = len(reddit_loader) * num_epochs
@@ -180,3 +179,7 @@ if __name__ == '__main__':
     # Write validation and test scores to logs.
     write_scores(val_score_file, xval_test_idx, val_scores)
     write_scores(test_score_file, xval_test_idx, test_scores)
+
+
+if __name__ == '__main__':
+    run()
