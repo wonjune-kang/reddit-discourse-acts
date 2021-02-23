@@ -24,7 +24,7 @@ class BERTClassifierModel(nn.Module):
         self.tokenizer.add_special_tokens(SPECIAL_TOKENS)
         self.bert.resize_token_embeddings(len(self.tokenizer))
 
-        self.classifier = nn.Linear(self.bert.hidden_size, num_classes)
+        self.classifier = nn.Linear(self.bert.config.hidden_size, num_classes)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, input_ids, attention_mask, token_type_ids):
