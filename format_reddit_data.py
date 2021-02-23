@@ -92,11 +92,19 @@ def generate_tree(thread_data):
         else:
             parent_id = post["in_reply_to"]
 
-        # Check if the post has a body; flag for removal if it does not.
+        # Check if the post has a body. For root posts, include the title along
+        # with the body. Flag the post for removal if it has no valid body.
         if "body" in post:
             body = post["body"]
             if body == "[deleted]":
-                remove = True
+                if is_root:
+                    body = title
+                else:
+                    remove = True
+            elif is_root:
+                body = " ".join([title, body])
+        elif is_root:
+            body = title
         else:
             remove = True
         
@@ -137,8 +145,8 @@ def process_all_trees(data_directory):
         tree = generate_tree(thread_data)
         
         # Use the tree only if it corresponds to a Reddit thread with
-        # at least one valid response in addition to the initial post.
-        if len(tree.nodes) > 1:
+        # at least one valid post.
+        if len(tree.nodes) > 0:
             all_trees.append(tree)
 
     return all_trees
