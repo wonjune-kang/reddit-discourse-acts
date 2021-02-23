@@ -40,7 +40,7 @@ class RedditDiscourseActTrainer:
         # Send the model inputs to the device.
         input_ids = encoded_subtree['input_ids'].to(self.device)
         attention_mask = encoded_subtree['attention_mask'].to(self.device)
-        token_type_ids = encoded_subtree['token_type_ids'] if 'token_type_ids' in encoded_subtree else None
+        token_type_ids = encoded_subtree['token_type_ids'].to(self.device) if 'token_type_ids' in encoded_subtree else None
 
         # Feed the inputs through the model and get the prediction.
         logits = self.model(input_ids, attention_mask, token_type_ids)
@@ -69,7 +69,7 @@ class RedditDiscourseActTrainer:
         """
         Evaluates the model's performance on an evaluation set of the dataset.
         Makes predictions for all RedditTree objects in the validation or
-        test split and compute the resulting node-level accuracy.
+        test split and computes the resulting node-level accuracy.
         """
         # Choose either validation or test set trees and nodes to evaluate.
         if eval_set == 'val':
@@ -106,10 +106,10 @@ class RedditDiscourseActTrainer:
         output_interval = len(dataloader) // 10
         criterion = nn.CrossEntropyLoss()
 
-        best_val_accuracy, best_test_accuracy = 0.0, 0.0
-        best_val_precision, best_test_precision = 0.0, 0.0
-        best_val_recall, best_test_recall = 0.0, 0.0
-        best_val_f1, best_test_f1 = 0.0, 0.0
+        best_val_accuracy = 0.0
+        best_val_precision = 0.0
+        best_val_recall = 0.0
+        best_val_f1 = 0.0
         for epoch in range(num_epochs):
             print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
             print('-' * 10)
@@ -125,7 +125,7 @@ class RedditDiscourseActTrainer:
             for batch_id, batch_encodings in enumerate(dataloader):
                 input_ids = batch_encodings['input_ids'].to(self.device)
                 attention_mask = batch_encodings['attention_mask'].to(self.device)
-                token_type_ids = batch_encodings['token_type_ids'] if 'token_type_ids' in batch_encodings else None
+                token_type_ids = batch_encodings['token_type_ids'].to(self.device) if 'token_type_ids' in batch_encodings else None
                 labels = batch_encodings['labels'].to(self.device)
 
                 # Zero parameter gradients.
@@ -227,11 +227,6 @@ class RedditDiscourseActTrainer:
         test_precision = precision_score(test_labels, test_pred, average='weighted')
         test_recall = recall_score(test_labels, test_pred, average='weighted')
         test_f1 = f1_score(test_labels, test_pred, average='weighted')
-
-        # best_test_accuracy = test_accuracy
-        # best_test_precision = test_precision
-        # best_test_recall = test_recall
-        # best_test_f1 = test_f1
 
         print("Test accuracy: {:.4f}".format(test_accuracy))
         print("Test precision: {:.4f}".format(test_precision))

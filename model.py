@@ -10,9 +10,6 @@ class BERTClassifierModel(nn.Module):
     def __init__(self, bert_encoder_type, num_classes=9, dropout=0.1):
         super(BERTClassifierModel, self).__init__()
 
-        assert bert_encoder_type in ['BERT-Base', 'DistilBERT'], \
-            "Only BERT-Base and DistilBERT encoders have been implemented"
-
         # Load pre-trained model weights and initialize corresponding tokenizer.
         if bert_encoder_type == 'BERT-Base':
             self.bert = BertModel.from_pretrained('bert-base-uncased')
@@ -20,13 +17,13 @@ class BERTClassifierModel(nn.Module):
         elif bert_encoder_type == 'DistilBERT':
             self.bert = DistilBertModel.from_pretrained('distilbert-base-uncased')
             self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        else:
+            raise Exception("Only 'BERT-Base' and 'DistilBERT' encoders have been implemented")
         
         # Add special tokens and resize model vocabulary.
         self.tokenizer.add_special_tokens(SPECIAL_TOKENS)
         self.bert.resize_token_embeddings(len(self.tokenizer))
 
-        # 768 is dimension of BERT embeddings.
-        # 9 is for the 9-way discourse act classification task.
         self.classifier = nn.Linear(self.bert.hidden_size, num_classes)
         self.dropout = nn.Dropout(dropout)
 

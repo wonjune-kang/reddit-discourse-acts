@@ -72,6 +72,7 @@ def get_subtree_string(target_node, max_subtree_depth, use_ancestor_label=True,
                     rand_label_idx = np.random.randint(0, len(IDX2LABELS))
                     label = IDX2LABELS[rand_label_idx]
             
+            # Add the label token to the start of the post body string.
             label_token = LABELS2TOKENS[label]
             processed = ' '.join([label_token, ancestor_node.body])
         
