@@ -1,2 +1,2 @@
 # reddit-discourse-acts
-Discourse act classification of Reddit posts.
+Code to finetune BERT-based models to perform discourse act classification on Reddit posts.
